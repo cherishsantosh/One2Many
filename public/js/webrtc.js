@@ -1,0 +1,281 @@
+var user = "<%= user %>";
+var room = "<%= room %>";
+var socket = io.connect('//' + location.host);
+var chat = document.getElementById('chatWindow');
+var users = document.getElementById('allUsers');
+var videos = document.getElementById('videos');
+var msg = document.getElementById('msg');
+var peerd = [];
+var localVideo = document.getElementById('localVideo'),
+    remoteVideo = {},
+    nativeuser = [],
+    localVideoStream = null,
+    peerConnCfg = {
+        'iceServers': [{
+            'url': 'stun:stun.services.mozilla.com'
+        }, {
+            'url': 'stun:stun.l.google.com:19302'
+        }]
+    };
+
+audioBandwidth = 50;
+videoBandwidth = 256;
+
+function setBandwidth(sdp) {
+    sdp = sdp.replace(/a=mid:audio\r\n/g, 'a=mid:audio\r\nb=AS:' + audioBandwidth + '\r\n');
+    sdp = sdp.replace(/a=mid:video\r\n/g, 'a=mid:video\r\nb=AS:' + videoBandwidth + '\r\n');
+    return sdp;
+}
+
+window.onbeforeunload = function() {
+    logout();
+}
+
+function logout() {
+    window.location = "/";
+}
+
+function trace(key, value) {
+    console.log("TIME: " + new Date().toLocaleString() + " KEY: " + key + " VALUE:" + value);
+}
+socket.on('trace', function(key, value) {
+    //console.log("TIME: "+new Date().toLocaleString()+" KEY: "+key+" VALUE:"+value);
+});
+socket.on('connect', function() {
+    socket.emit('addUser', user, room);
+    document.getElementById("call_btn").disabled = false;
+});
+
+socket.on('error', function() {
+    document.getElementById("call_btn").disabled = true;
+});
+socket.on('updateChat', function(username, data, del) {
+    if (username == "SERVER") {
+        document.getElementById("call_btn").disabled = false;
+        //console.log(del);
+        if (del)
+            endCall(del);
+    } else {
+        chat.innerHTML += '<li><b>' + username + '</b> : ' + data + '</li>';
+    }
+});
+socket.on('updateUsers', function(usernames, username) {
+
+    for (i in usernames) {
+        if (user != usernames[i]) {
+            users.innerHTML += '<option value=' + usernames[i] + '>' + usernames[i] + '</option>\n';
+            console.log(user + " IF " + i + "<SENT>" + usernames[i]);
+            nativeuser[i] = usernames[i];
+        } else {
+            console.log(user + " ELSE " + i + "<SENT>" + usernames[i]);
+        }
+    };
+    console.log(usernames);
+});
+socket.on('connuser', function(usernames, username) {
+    console.log("*****************************************************************");
+    for (i in usernames) {
+        if (user != usernames[i]) {
+            users.innerHTML += '<option value=' + usernames[i] + '>' + usernames[i] + '</option>\n';
+            console.log(user + " IF " + i + "<SENT>" + usernames[i]);
+            nativeuser[i] = usernames[i];
+        } else {
+            console.log(user + " ELSE " + i + "<SENT>" + usernames[i]);
+        }
+    };
+
+    for (k in nativeuser) {
+        setTimeout(
+            function() {
+                connect(nativeuser[k])
+            }
+            //alert("Connected to "+nativeuser[k])
+            , 3000);
+    };
+});
+socket.on('chat message', function(msg) {
+    var signal = null;
+    signal = JSON.parse(msg);
+    var choosed = signal.choosed;
+
+    if (!peerd[choosed]) {
+
+        // videos.innerHTML +='<div name="message">'+
+        // '<div><b>'+choosed+'</b></div>'+
+        // '<video width="160" height="120" id='+choosed+' autoplay controls></video>'+
+        // '</div>';
+        videocomponant(choosed);
+        console.log("*******************222222222 ************************************");
+        remoteVideo[choosed] = document.getElementById(choosed);
+        localVideo = document.getElementById('localVideo');
+        answerCall(choosed);
+    }
+    if (signal.sdp) {
+        peerd[choosed].setRemoteDescription(new RTCSessionDescription(signal.sdp));
+    } else if (signal.candidate) {
+        peerd[choosed].addIceCandidate(new RTCIceCandidate(signal.candidate));
+    } else if (signal.closeConnection) {
+        endCall(choosed);
+    }
+});
+
+/***************************************  SOCKET-IO END   *******************************************************/
+function connect(user) {
+    //console.log("Choosed User is: "+users.value);
+    trace("Chossed user", user);
+    var choosed = user;
+    if (choosed == "none") {
+        alert('Select valid user.. :(');
+    } else {
+        if (document.getElementById(choosed)) {
+            //console.log('exists')
+        } else {
+            videocomponant(choosed);
+            console.log("*******************11111 ************************************");
+        }
+        if (navigator.getUserMedia) {
+            localVideo = document.getElementById('localVideo');
+            remoteVideo[choosed] = document.getElementById(choosed);
+            initiateCall(choosed);
+        } else {
+            alert("Sorry, your browser does not support WebRTC!")
+        }
+    }
+};
+
+function videocomponant(choosed) {
+    var video = document.createElement('video');
+    video.height = "120";
+    video.width = "160";
+    video.id = choosed;
+    video.autoplay = true;
+    video.controls = true;
+    videos.appendChild(video);
+}
+
+function initiateCall(choosed) {
+    prepareCall(choosed);
+    navigator.getUserMedia({
+        "audio": false,
+        "video": {
+            width: {
+                exact: 160
+            }, //new syntax
+            height: {
+                exact: 120
+            }
+        }
+    }, function(stream) {
+        localVideoStream = stream;
+        localVideo.src = URL.createObjectURL(localVideoStream);
+        peerd[choosed].addStream(localVideoStream);
+
+        createAndSendOffer(choosed);
+
+        console.log('offer sent');
+    }, function(error) {
+        console.log(error);
+    });
+};
+
+function prepareCall(choosed) {
+    console.log('preparing call for ' + choosed);
+    peerd[choosed] = new RTCPeerConnection(peerConnCfg);
+    // send any ice candidates to the other peer
+    peerd[choosed].onicecandidate = function(evt) {
+        console.log("Inside ice candidate");
+        if (!evt || !evt.candidate) return;
+        //wsc.send(JSON.stringify({"candidate": evt.candidate }));
+        console.log("Socket emmits chat message");
+        socket.emit('chat message', JSON.stringify({
+            "candidate": evt.candidate,
+            "choosed": choosed
+        }));
+        console.log("Event.Candidate: " + evt.candidate);
+    };
+    // once remote stream arrives, show it in the remote video element
+    try {
+        peerd[choosed].onaddstream = function(evt) {
+            //setTimeout(remoteVideo[choosed].src = URL.createObjectURL(evt.stream),2000);
+            remoteVideo[choosed].src = URL.createObjectURL(evt.stream)
+        };
+    } catch (e) {
+        console.log("+++++++++++++++++++++++++++++++++++++++Remote stream set stream is failed");
+    }
+};
+
+function createAndSendOffer(choosed) {
+    console.log('Creating and sending offer');
+    peerd[choosed].createOffer(
+        function(offer) {
+            var off = new RTCSessionDescription(offer);
+            off.sdp = setBandwidth(off.sdp);
+            peerd[choosed].setLocalDescription(off, function() {
+                socket.emit('chat message', JSON.stringify({
+                    "sdp": off,
+                    "choosed": choosed
+                }));
+                console.log('offer send');
+            }, function(error) {
+                console.log(error);
+            });
+        },
+        function(error) {
+            console.log(error);
+        }
+    );
+};
+/****************************************************/
+function answerCall(choosed) {
+    prepareCall(choosed);
+    console.log("Answering call of : " + choosed);
+
+    // get the local stream, show it in the local video element and send it
+    navigator.getUserMedia({
+        "audio": false,
+        "video": {
+            width: {
+                exact: 160
+            }, //new syntax
+            height: {
+                exact: 120
+            }
+        }
+    }, function(stream) {
+        localVideoStream = stream;
+        localVideo.src = URL.createObjectURL(localVideoStream);
+        peerd[choosed].addStream(localVideoStream);
+        createAndSendAnswer(choosed);
+    }, function(error) {
+        console.log(error);
+    });
+};
+
+function createAndSendAnswer(choosed) {
+    peerd[choosed].createAnswer(
+        function(answer) {
+            var ans = new RTCSessionDescription(answer);
+            ans.sdp = setBandwidth(ans.sdp);
+            peerd[choosed].setLocalDescription(ans, function() {
+                socket.emit('chat message', JSON.stringify({
+                    "sdp": ans,
+                    "choosed": choosed
+                }));
+                console.log('answer send to ' + choosed);
+            }, function(error) {
+                console.log(error);
+            });
+        },
+        function(error) {
+            console.log(error);
+        }
+    );
+};
+
+function endCall(choosed) {
+    //peerd[choosed].close();
+    delete peerd[choosed];
+    //remoteVideo[choosed].src = "";
+    //var elem= document.getElementById(choosed).parentElement;
+    //elem.parentElement.removeChild(elem);
+};

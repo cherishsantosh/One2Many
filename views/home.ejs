@@ -1,0 +1,15 @@
+<link rel="stylesheet" href="/css/bootstrap.min.css" >
+<link rel="stylesheet" href="/css/custumcss.css" >
+
+<form method="post" action="/login">
+  <div class="logindiv" class="col-md-3">
+    <h3>Login</h3>
+   <span> Username:</span>
+    <input type="text" class="form-control" name="userName" placeholder="We are excepting your username" required /><br>
+    <span> Roomname:</span>
+    <input type="text" class="form-control"  name="room" placeholder="We are excepting your roomname" required /><br>
+    <label class="hidediv" ><b>Enter Auth Key:</b></label>
+    <input class="hidediv" class="form-control"  name="auth" value="webrtc@123#" required /><br><br>
+    <button type="submit" class="btn btn-success">Submit</button>
+  </div>
+</form>

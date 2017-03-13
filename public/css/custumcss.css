@@ -1,0 +1,62 @@
+.loginforms{
+  position:absolute;
+  margin-top:10%;
+  margin-left:25%;
+}
+
+.logindiv{
+  position: absolute;
+  left: 70%;
+  top: 20%;
+  box-shadow: 10px 10px 5px #888888;
+  padding-left:30px;
+  padding-bottom:30px;
+  padding-right:30px;
+  padding-top:80px;
+  width: 25%;
+  align:center;
+}
+.hidediv{
+  display:none;
+}
+html, body {
+  height: 100%;
+}
+
+footer {
+  position: absolute;
+  bottom: 0;
+}
+
+.videos {
+    font-size: 0;
+    height: 100%;
+    pointer-events: none;
+    position: absolute;
+    transition: all 1s;
+    width: 100%;
+}
+
+
+
+
+
+
+.navbar-login
+{
+    width: 305px;
+    padding: 10px;
+    padding-bottom: 0px;
+}
+
+.navbar-login-session
+{
+    padding: 10px;
+    padding-bottom: 0px;
+    padding-top: 0px;
+}
+
+.icon-size
+{
+    font-size: 87px;
+}
